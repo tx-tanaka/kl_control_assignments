@@ -85,7 +85,17 @@ def compute_path_rewards(grid, states, actions, alpha):
     # for numerical stability.
     #
     # ##########################################################
-    raise NotImplementedError("TODO: compute_path_rewards")
+    # raise NotImplementedError("TODO: compute_path_rewards")
+
+    for i in range(N):
+        for t in range(horizon):
+            path_costs[i] += grid.cost(states[i, t], actions[i, t])
+        path_costs[i] += grid.terminal_cost(states[i, -1])
+
+    # Subtract min for numerical stability; return offset so caller
+    # can recover the true scale: Z = mean(rewards) * exp(-C_min/alpha)
+    C_min = np.min(path_costs)
+    rewards = np.exp(-(path_costs - C_min) / alpha)
 
     return rewards, C_min
 
@@ -118,7 +128,11 @@ def empirical_reward_per_action(rewards, first_actions, n_actions):
     # rewards over the total number of paths N.
     #
     # ##########################################################
-    raise NotImplementedError("TODO: empirical_reward_per_action")
+    # raise NotImplementedError("TODO: empirical_reward_per_action")
+
+    for u in range(n_actions):
+        mask = first_actions == u
+        r_per_action[u] = np.sum(rewards[mask]) / N
 
     return r_per_action
 
@@ -141,9 +155,12 @@ def approximate_policy(r_per_action):
     # is near zero, fall back to uniform.
     #
     # ##########################################################
-    raise NotImplementedError("TODO: approximate_policy")
+    # raise NotImplementedError("TODO: approximate_policy")
 
-    return Q_approx
+    total = np.sum(r_per_action)
+    if total < 1e-300:
+        return np.ones(len(r_per_action)) / len(r_per_action)
+    return r_per_action / total
 
 
 def sample_action(Q_approx, rng=None):

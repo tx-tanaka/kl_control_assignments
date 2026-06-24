@@ -44,8 +44,14 @@ def z_power_iteration(M, goal_state, n_iters):
     # normalize. Store each iterate in history.
     #
     # ##########################################################
-    raise NotImplementedError("TODO: z_power_iteration")
+    # raise NotImplementedError("TODO: z_power_iteration")
 
+    for _ in range(n_iters):
+        Z = M @ Z
+        Z[goal_state] = 1.0
+        Z /= Z[goal_state] + 1e-300
+        history.append(Z.copy())
+    
     return Z, history
 
 

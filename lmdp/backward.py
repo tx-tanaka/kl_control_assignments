@@ -40,8 +40,15 @@ def build_M_matrix(grid, alpha):
     # exponentiated negative cost scaled by alpha.
     #
     # ##########################################################
-    raise NotImplementedError("TODO: build_M_matrix")
+    # raise NotImplementedError("TODO: build_M_matrix")
 
+    for x in range(n):
+        R_u = grid.reference_policy(x)
+        for u in range(grid.n_actions):
+            x_next = grid.step(x, u)
+            c = grid.cost(x, u)
+            M[x, x_next] += R_u[u] * np.exp(-c / alpha)
+    
     return M
 
 
@@ -92,7 +99,10 @@ def backward_recursion(Z_T, M, T):
     # product: Z_k = M * Z_{k+1}.
     #
     # ##########################################################
-    raise NotImplementedError("TODO: backward_recursion")
+    # raise NotImplementedError("TODO: backward_recursion")
+
+    for k in range(T - 1, -1, -1):  
+        Z[k] = M @ Z[k + 1]
 
     return Z
 
@@ -126,7 +136,22 @@ def reconstruct_policy(grid, Z, alpha):
     # sum to 1. If Z[k, x] is near zero, fall back to uniform.
     #
     # ##########################################################
-    raise NotImplementedError("TODO: reconstruct_policy")
+    # raise NotImplementedError("TODO: reconstruct_policy")
+
+    for k in range(T):
+        for x in range(n):
+            if Z[k, x] < 1e-300:
+                policy[k, x] = 1.0 / grid.n_actions
+                continue
+            R_u = grid.reference_policy(x)
+            for u in range(grid.n_actions):
+                x_next = grid.step(x, u)
+                c = grid.cost(x, u)
+                policy[k, x, u] = R_u[u] * np.exp(-c / alpha) * Z[k + 1, x_next] / Z[k, x]
+
+            total = policy[k, x].sum()
+            if total > 0:
+                policy[k, x] /= total
 
     return policy
 

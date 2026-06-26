@@ -64,6 +64,27 @@ def z_learning(grid, alpha, goal_state, n_episodes, max_steps, rng,
     # Append Z.copy() to history after each episode.
     #
     # ##########################################################
-    raise NotImplementedError("TODO: z_learning")
+    # raise NotImplementedError("TODO: z_learning")
+
+    for ep in range(n_episodes):
+        x = rng.choice(valid_starts)
+
+        for _ in range(max_steps):
+            if x == goal_state:
+                break
+
+            R_u = grid.reference_policy(x)
+            u = rng.choice(grid.n_actions, p=R_u)
+            x_next = grid.step(x, u)
+            c = grid.cost(x, u)
+
+            theta = warmup / (warmup + visit_counts[x])
+            visit_counts[x] += 1
+            Z[x] = (1 - theta) * Z[x] + theta * np.exp(-c / alpha) * Z[x_next]
+
+            x = x_next
+
+        Z[goal_state] = 1.0
+        history.append(Z.copy())
 
     return Z, history

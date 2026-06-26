@@ -21,7 +21,10 @@ parser = argparse.ArgumentParser(description='Cart-pole swing-up via MPPI')
 parser.add_argument('--animate', action='store_true', help='Real-time animation')
 parser.add_argument('--continuous', action='store_true', help='Use SDE formulation')
 parser.add_argument('--gpu', action='store_true')
-parser.add_argument('--samples', type=int, default=1024)
+parser.add_argument('--samples', '--K', type=int, default=1024, help='Number of samples')
+parser.add_argument('--T', type=int, default=50, help='Planning horizon')
+parser.add_argument('--sigma', type=float, default=3.0, help='Control noise std dev')
+parser.add_argument('--lambda_', '--lambda', type=float, default=10.0, help='Temperature parameter')
 parser.add_argument('--save', type=str, default=None)
 args = parser.parse_args()
 
@@ -49,8 +52,8 @@ CART_W, CART_H = 0.3, 0.15
 
 model = CartPole()
 np.random.seed(42)
-solver = MPPI(model, K=args.samples, T=50, dt=DT, lambda_=10.0,
-              sigma=[3.0], use_gpu=args.gpu)
+solver = MPPI(model, K=args.samples, T=args.T, dt=DT, lambda_=args.lambda_,
+              sigma=[args.sigma], use_gpu=args.gpu)
 xp = solver.xp
 x = xp.array([0.0, 0.0, np.pi, 0.0], dtype=xp.float32)
 

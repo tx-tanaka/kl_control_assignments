@@ -224,6 +224,8 @@ def main():
     parser.add_argument('--T', type=int, default=DEFAULT_T)
     parser.add_argument('--grid_size', type=int, default=DEFAULT_GRID)
     parser.add_argument('--N', type=int, default=DEFAULT_N, help='MC samples per step')
+    parser.add_argument('--all_N', action='store_true',
+                        help='Sweep N values and plot cost vs sample budget')
     parser.add_argument('--save', type=str, default=None)
     args = parser.parse_args()
 
@@ -265,22 +267,6 @@ def main():
         run_animate(grid, env, mc_trajs, start, env_name, args)
         return
 
-    # --- Closed-loop performance: trajectory cost vs N samples per step ---
-    N_values = [10, 25, 50, 100, 200, 500]
-    traj_cost_means = []
-    traj_cost_stds = []
-    for n_samples in N_values:
-        costs = []
-        for trial in range(10):
-            traj, acts, _ = forward_mc_control(
-                grid, start, T, n_samples, alpha,
-                rng=np.random.default_rng(SEED + 2000 + trial))
-            c = sum(grid.cost(traj[i], acts[i]) for i in range(len(acts)))
-            c += grid.terminal_cost(traj[-1])
-            costs.append(c)
-        traj_cost_means.append(np.mean(costs))
-        traj_cost_stds.append(np.std(costs))
-
     # --- Exact policy costs ---
     exact_costs_list = []
     for ep in range(N_MC_EPISODES):
@@ -290,46 +276,72 @@ def main():
         cost += grid.terminal_cost(traj[-1])
         exact_costs_list.append(cost)
 
-    # === Plotting (2x2) ===
+    # --- Closed-loop performance: trajectory cost vs N samples per step ---
+    if args.all_N:
+        N_values = [50, 200, 500, 2000, 5000]
+        traj_cost_means = []
+        traj_cost_stds = []
+        for n_samples in N_values:
+            costs = []
+            for trial in range(10):
+                traj, acts, _ = forward_mc_control(
+                    grid, start, T, n_samples, alpha,
+                    rng=np.random.default_rng(SEED + 2000 + trial))
+                c = sum(grid.cost(traj[i], acts[i]) for i in range(len(acts)))
+                c += grid.terminal_cost(traj[-1])
+                costs.append(c)
+            traj_cost_means.append(np.mean(costs))
+            traj_cost_stds.append(np.std(costs))
+            print(f'  N={n_samples:5d}: mean_cost={traj_cost_means[-1]:.0f} +/- {traj_cost_stds[-1]:.0f}')
+
+    # === Plotting ===
     apply_style()
 
-    fig, axes = plt.subplots(2, 2, figsize=(12, 10))
+    if args.all_N:
+        fig, axes = plt.subplots(2, 2, figsize=(12, 10))
+        ax_traj, ax_cost = axes[0, 0], axes[0, 1]
+        ax_policy, ax_hist = axes[1, 0], axes[1, 1]
+    else:
+        fig, axes = plt.subplots(1, 3, figsize=(16, 5))
+        ax_traj, ax_policy, ax_hist = axes[0], axes[1], axes[2]
+        ax_cost = None
 
-    # Panel 1: MC trajectories
-    draw_grid(axes[0, 0], grid, env, start,
+    # Panel: MC trajectories
+    draw_grid(ax_traj, grid, env, start,
               title=f'Forward MC trajectories ({mc_reached}/{N_MC_EPISODES} reach goal)')
     for traj in mc_trajs:
         coords = [state_to_xy(grid, s) for s in traj]
         xs, ys = zip(*coords)
         reached = grid.state_to_rc(traj[-1]) == grid.goal
         color = COLORS['primary'] if reached else COLORS['gray']
-        axes[0, 0].plot(xs, ys, '-', linewidth=0.8, alpha=0.5, color=color)
-    label_panel(axes[0, 0], 'a')
+        ax_traj.plot(xs, ys, '-', linewidth=0.8, alpha=0.5, color=color)
+    label_panel(ax_traj, 'a')
 
-    # Panel 2: Trajectory cost vs N (closed-loop performance)
-    exact_mean = np.mean(exact_costs_list)
-    axes[0, 1].errorbar(N_values, traj_cost_means, yerr=traj_cost_stds,
-                        fmt='o-', color=COLORS['secondary'], capsize=4,
-                        label='Forward MC')
-    axes[0, 1].axhline(exact_mean, color=COLORS['gray'], linestyle='--', linewidth=1.5,
-                       label=f'Exact backward (mean={exact_mean:.0f})')
-    axes[0, 1].set_xlabel(r'MC samples per step $N$')
-    axes[0, 1].set_ylabel('Trajectory cost')
-    axes[0, 1].set_title('Closed-loop cost vs sample budget')
-    axes[0, 1].set_xscale('log')
-    axes[0, 1].legend()
-    label_panel(axes[0, 1], 'b')
+    # Panel: Trajectory cost vs N (only with --all_N)
+    if ax_cost is not None:
+        exact_mean = np.mean(exact_costs_list)
+        ax_cost.errorbar(N_values, traj_cost_means, yerr=traj_cost_stds,
+                         fmt='o-', color=COLORS['secondary'], capsize=4,
+                         label='Forward MC')
+        ax_cost.axhline(exact_mean, color=COLORS['gray'], linestyle='--', linewidth=1.5,
+                        label=f'Exact backward (mean={exact_mean:.0f})')
+        ax_cost.set_xlabel(r'MC samples per step $N$')
+        ax_cost.set_ylabel('Trajectory cost')
+        ax_cost.set_title('Closed-loop cost vs sample budget')
+        ax_cost.set_xscale('log')
+        ax_cost.legend()
+        label_panel(ax_cost, 'b')
 
-    # Panel 3: MC vs exact policy arrows on value function heatmap
+    # Panel: MC vs exact policy arrows on value function heatmap
     V_exact = value_from_desirability(Z_exact, alpha)
     V_grid = V_exact[0].reshape(grid.n_rows, grid.n_cols)
     bounds = grid._env_bounds
-    im3 = axes[1, 0].imshow(V_grid, cmap='RdYlBu_r', origin='upper',
-                            extent=[bounds[0], bounds[1], bounds[2], bounds[3]],
-                            aspect='equal')
-    env.draw_cost_contours(axes[1, 0], bounds=bounds)
-    plt.colorbar(im3, ax=axes[1, 0], shrink=0.8)
-    axes[1, 0].set_title('Policy: MC (blue) vs exact (black)')
+    im3 = ax_policy.imshow(V_grid, cmap='RdYlBu_r', origin='upper',
+                           extent=[bounds[0], bounds[1], bounds[2], bounds[3]],
+                           aspect='equal')
+    env.draw_cost_contours(ax_policy, bounds=bounds)
+    plt.colorbar(im3, ax=ax_policy, shrink=0.8)
+    ax_policy.set_title('Policy: MC (blue) vs exact (black)')
 
     angle_map = {
         0: 0, 1: 180, 2: 270, 3: 90,
@@ -352,28 +364,28 @@ def main():
         if (r_idx, c_idx) in grid.obstacles or x == goal_state:
             continue
         cx, cy = state_to_xy(grid, x)
-        best_exact = np.argmax(policy_exact[0, x])
-        if best_exact in angle_map:
-            m = MarkerStyle('^').rotated(deg=-angle_map[best_exact])
-            axes[1, 0].scatter(cx, cy, marker=m, s=40, c='black',
-                               alpha=0.7, zorder=5, linewidths=0)
         best_mc = np.argmax(mc_policy_0[x])
         if best_mc in angle_map:
             m = MarkerStyle('^').rotated(deg=-angle_map[best_mc])
-            axes[1, 0].scatter(cx, cy, marker=m, s=25, c=COLORS['primary'],
-                               alpha=0.5, zorder=4, linewidths=0)
-    label_panel(axes[1, 0], 'c')
+            ax_policy.scatter(cx, cy, marker=m, s=40, c=COLORS['primary'],
+                              alpha=0.7, zorder=5, linewidths=0)
+        best_exact = np.argmax(policy_exact[0, x])
+        if best_exact in angle_map:
+            m = MarkerStyle('^').rotated(deg=-angle_map[best_exact])
+            ax_policy.scatter(cx, cy, marker=m, s=25, c='black',
+                              alpha=0.5, zorder=4, linewidths=0)
+    label_panel(ax_policy, 'b' if ax_cost is None else 'c')
 
-    # Panel 4: Cost distributions
-    axes[1, 1].hist(exact_costs_list, bins=15, alpha=0.5, color=COLORS['gray'],
-                    label='Exact backward policy', density=True)
-    axes[1, 1].hist(mc_costs_list, bins=15, alpha=0.5, color=COLORS['secondary'],
-                    label='Forward MC policy', density=True)
-    axes[1, 1].set_xlabel('Trajectory cost')
-    axes[1, 1].set_ylabel('Density')
-    axes[1, 1].set_title('Trajectory cost distribution')
-    axes[1, 1].legend()
-    label_panel(axes[1, 1], 'd')
+    # Panel: Cost distributions
+    ax_hist.hist(exact_costs_list, bins=15, alpha=0.5, color=COLORS['gray'],
+                 label='Exact backward policy', density=True)
+    ax_hist.hist(mc_costs_list, bins=15, alpha=0.5, color=COLORS['secondary'],
+                 label='Forward MC policy', density=True)
+    ax_hist.set_xlabel('Trajectory cost')
+    ax_hist.set_ylabel('Density')
+    ax_hist.set_title('Trajectory cost distribution')
+    ax_hist.legend()
+    label_panel(ax_hist, 'c' if ax_cost is None else 'd')
 
     fig.suptitle(f'Forward MC KL control ({env_name})', fontsize=13)
     plt.tight_layout()

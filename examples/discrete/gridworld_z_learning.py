@@ -38,7 +38,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 from environments import Environment
 from lmdp.gridworld import GridWorld
 from lmdp.backward import build_M_matrix
-from lmdp.z_learning import z_linear_solve, z_power_iteration, policy_from_Z
+from lmdp.z_iteration import z_linear_solve, z_power_iteration, policy_from_Z
+from lmdp.z_learning import z_learning
 
 
 DEFAULT_ENV = 'config/environments/three_mountains.yaml'
@@ -175,6 +176,8 @@ def main():
     parser.add_argument('--T', type=int, default=DEFAULT_T)
     parser.add_argument('--grid_size', type=int, default=DEFAULT_GRID)
     parser.add_argument('--iters', type=int, default=DEFAULT_ITERS)
+    parser.add_argument('--z_episodes', type=int, default=10000,
+                        help='Number of Z-learning episodes')
     parser.add_argument('--save', type=str, default=None)
     args = parser.parse_args()
 
@@ -219,6 +222,17 @@ def main():
         err = np.max(np.abs(Z_snap - Z_solve))
         errors.append(err)
 
+    # --- Z-learning (Eq. 7.82) ---
+    max_steps_zl = grid.n_states * 4
+    Z_zl, Z_zl_history = z_learning(
+        grid, alpha, goal_state, args.z_episodes, max_steps_zl, rng)
+    zl_errors = []
+    for Z_snap in Z_zl_history:
+        err = np.max(np.abs(Z_snap - Z_solve))
+        zl_errors.append(err)
+    print(f'Z-learning: {args.z_episodes} episodes, '
+          f'final error = {zl_errors[-1]:.6f}')
+
     # === Plotting (2x2) ===
     apply_style()
     fig, axes = plt.subplots(2, 2, figsize=(11, 10))
@@ -259,12 +273,25 @@ def main():
     axes[0, 1].set_title(r'$V(x)$ + stationary policy $Q^*(u|x)$')
     label_panel(axes[0, 1], 'b')
 
-    # (c) Power iteration convergence
-    axes[1, 0].semilogy(errors, color=COLORS['primary'], linewidth=1.5)
+    # (c) Convergence: power iteration vs Z-learning (log-log)
+    iters = np.arange(len(errors))
+    axes[1, 0].loglog(iters[1:], errors[1:], color=COLORS['primary'], linewidth=1.5,
+                      label='Z-iteration (Eq. 7.76)')
     axes[1, 0].set_xlabel('Iteration')
-    axes[1, 0].set_ylabel(r'$\|Z^{(k)} - Z^*\|_\infty$')
-    axes[1, 0].set_title('Power iteration convergence')
+    axes[1, 0].set_ylabel(r'$\|Z - Z^*\|_\infty$')
+    axes[1, 0].set_title('Convergence')
     axes[1, 0].grid(True, alpha=0.3)
+
+    ax_zl = axes[1, 0].twiny()
+    eps = np.arange(len(zl_errors))
+    ax_zl.loglog(eps[1:], zl_errors[1:], color=COLORS['secondary'], linewidth=1.5,
+                 alpha=0.7, label='Z-learning (Eq. 7.82)')
+    ax_zl.set_xlabel('Episode', color=COLORS['secondary'])
+    ax_zl.tick_params(axis='x', colors=COLORS['secondary'])
+
+    lines1, labels1 = axes[1, 0].get_legend_handles_labels()
+    lines2, labels2 = ax_zl.get_legend_handles_labels()
+    axes[1, 0].legend(lines1 + lines2, labels1 + labels2, fontsize=8)
     label_panel(axes[1, 0], 'c')
 
     # (d) Trajectories under stationary policy

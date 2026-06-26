@@ -180,10 +180,15 @@ def run_animate(args, env=None):
         if dist < 0.3:
             info_text.set_text(f"REACHED GOAL in {state['step']} steps!  crashes={state['crash_count']}")
             state["done"] = True
+            if not (args.save and args.save.endswith((".mp4", ".gif"))):
+                fig.canvas.draw_idle()
+                fig.canvas.flush_events()
+                plt.close(fig)
 
         return sample_lines + [planned_line, trail_line, pos_dot, heading_arrow, info_text]
 
     anim = FuncAnimation(fig, update, frames=400, interval=30, blit=True, repeat=False)
+    state["anim"] = anim
 
     if args.save and args.save.endswith((".mp4", ".gif")):
         anim.save(args.save, fps=20, dpi=120)
@@ -292,8 +297,8 @@ def run_static(args, env=None):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="MPPI Unicycle Example")
     parser.add_argument("--animate", action="store_true", help="Real-time animated visualization")
-    parser.add_argument("--env", type=str, default=None,
-                        help="Environment YAML (three_mountains, forest, u_trap, double_slit, drunken_bridge, landing_site, simple_goal)")
+    parser.add_argument("--env", type=str, default="config/environments/three_mountains.yaml",
+                        help="Path to environment YAML (e.g., config/environments/three_mountains.yaml)")
     parser.add_argument("--continuous", action="store_true", help="Use continuous-time SDE formulation")
     parser.add_argument("--gpu", action="store_true", help="Use CuPy for GPU acceleration")
     parser.add_argument("--save", type=str, default=None, help="Save figure/animation to file")

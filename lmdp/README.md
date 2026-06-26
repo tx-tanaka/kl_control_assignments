@@ -34,9 +34,13 @@ Q*(u|x) ≈ r(x,u) / r(x)
 
 This ratio cancels the absolute scale of the desirability, so the policy estimate is meaningful even when Z is extremely small. The cost is that performance depends on the horizon T being long enough for random walks under R to reach the goal. Since a random walk's displacement scales as sqrt(T) rather than T, the required horizon can be significantly longer than the path length under the optimal policy.
 
+## Z-iteration (`z_iteration.py`)
+
+Solves the infinite-horizon version of the problem using the full model. With an absorbing goal state (Z(goal) = 1, zero cost, self-transitions), the fixed-point equation Z = M @ Z can be solved directly via (I - M_red)^{-1} m_goal, or iteratively via power iteration Z^{k+1} = M @ Z^{k} (Eq. 7.76). The resulting policy is stationary (time-independent).
+
 ## Z-learning (`z_learning.py`)
 
-Solves the infinite-horizon version of the problem. With an absorbing goal state (Z(goal) = 1, zero cost, self-transitions), the fixed-point equation Z = M @ Z can be solved directly via (I - M_red)^{-1} m_goal, or iteratively via power iteration Z^{k+1} = M @ Z^{k}. The resulting policy is stationary (time-independent).
+Data-driven alternative to Z-iteration (Section 7.3.3). Instead of building the full M matrix, Z-learning updates the estimate online from individual transitions generated under the reference policy (Eq. 7.82). Converges to the same fixed point as Z-iteration but does not require knowledge of the transition model.
 
 ## Gridworld (`gridworld.py`)
 

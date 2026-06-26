@@ -13,6 +13,20 @@ Key equations:
 import numpy as np
 
 
+def _build_lookup_tables(grid):
+    """Precompute transition and cost tables for vectorized simulation."""
+    S, A = grid.n_states, grid.n_actions
+    transition = np.zeros((S, A), dtype=int)
+    cost_table = np.zeros((S, A))
+    terminal = np.zeros(S)
+    for s in range(S):
+        for a in range(A):
+            transition[s, a] = grid.step(s, a)
+            cost_table[s, a] = grid.cost(s, a)
+        terminal[s] = grid.terminal_cost(s)
+    return transition, cost_table, terminal
+
+
 def generate_sample_paths(grid, x0, k, T, N, rng=None):
     """Generate N sample paths from state x0 at time k under reference R.
 
@@ -42,17 +56,19 @@ def generate_sample_paths(grid, x0, k, T, N, rng=None):
     if rng is None:
         rng = np.random.default_rng()
 
+    if not hasattr(grid, '_transition_table'):
+        grid._transition_table, grid._cost_table, grid._terminal_table = \
+            _build_lookup_tables(grid)
+
+    transition = grid._transition_table
     horizon = T - k
     states = np.zeros((N, horizon + 1), dtype=int)
     actions = np.zeros((N, horizon), dtype=int)
     states[:, 0] = x0
 
     for t in range(horizon):
-        for i in range(N):
-            R_u = grid.reference_policy(states[i, t])
-            a = rng.choice(grid.n_actions, p=R_u)
-            actions[i, t] = a
-            states[i, t + 1] = grid.step(states[i, t], a)
+        actions[:, t] = rng.integers(0, grid.n_actions, size=N)
+        states[:, t + 1] = transition[states[:, t], actions[:, t]]
 
     return states, actions
 
@@ -70,27 +86,36 @@ def compute_path_rewards(grid, states, actions, alpha):
     Returns
     -------
     rewards : array of shape (N,)
+    C_min : float
+        Minimum path cost, subtracted before exponentiating for stability.
     """
+    if not hasattr(grid, '_cost_table'):
+        grid._transition_table, grid._cost_table, grid._terminal_table = \
+            _build_lookup_tables(grid)
+
     N, horizon = actions.shape
     path_costs = np.zeros(N)
 
     # ##########################################################
     # TODO: Compute path rewards for each sample path
-    # (Eq. 7.37). Loop over each path i and each time step t,
-    # accumulating the running cost using grid.cost(state,
-    # action). Add the terminal cost via grid.terminal_cost()
-    # for the final state. Convert total path costs to
-    # desirability scores by exponentiating the negative cost
-    # scaled by alpha. Subtract C_min before exponentiating
-    # for numerical stability.
+    # (Eq. 7.37). Accumulate running cost and terminal cost
+    # for each path, then convert to desirability scores via
+    # r(i) = exp(-(C_i - C_min) / alpha).
+    #
+    # Lookup tables are available on the grid object (built by
+    # generate_sample_paths):
+    #   grid._cost_table[state, action] -> running cost
+    #   grid._terminal_table[state]     -> terminal cost
+    # Use these for vectorized computation over all N paths.
     #
     # ##########################################################
     # raise NotImplementedError("TODO: compute_path_rewards")
 
-    for i in range(N):
-        for t in range(horizon):
-            path_costs[i] += grid.cost(states[i, t], actions[i, t])
-        path_costs[i] += grid.terminal_cost(states[i, -1])
+    cost_table = grid._cost_table
+    terminal_table = grid._terminal_table
+    for t in range(horizon):
+        path_costs += cost_table[states[:, t], actions[:, t]]
+    path_costs += terminal_table[states[:, -1]]
 
     # Subtract min for numerical stability; return offset so caller
     # can recover the true scale: Z = mean(rewards) * exp(-C_min/alpha)

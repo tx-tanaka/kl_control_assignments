@@ -5,10 +5,10 @@ A 2D point mass must reach a goal while avoiding circular obstacles.
 Demonstrates both discrete-time and continuous-time (SDE) MPPI.
 
 Usage:
-    python examples/double_integrator.py --animate
-    python examples/double_integrator.py --animate --continuous
-    python examples/double_integrator.py --animate --gpu
-    python examples/double_integrator.py --save trajectory.png
+    python examples/discrete/double_integrator.py --animate
+    python examples/discrete/double_integrator.py --animate --continuous
+    python examples/discrete/double_integrator.py --animate --gpu
+    python examples/discrete/double_integrator.py --save trajectory.png
 """
 
 import argparse
@@ -41,7 +41,8 @@ N_SHOW_SAMPLES = 40
 def make_solver(args):
     set_backend(args.gpu)
     model = DoubleIntegrator(goal=GOAL, obs=OBSTACLES)
-    solver = MPPI(model, K=1024, T=40, dt=0.05, lambda_=10.0, sigma=[1.0, 1.0], use_gpu=args.gpu)
+    solver = MPPI(model, K=args.K, T=args.T, dt=0.05, lambda_=args.lambda_,
+                  sigma=[args.sigma, args.sigma], use_gpu=args.gpu)
     return model, solver
 
 
@@ -122,6 +123,10 @@ def run_animate(args):
         if dist < 0.3:
             info_text.set_text(f"REACHED GOAL in {state['step']} steps!")
             state["done"] = True
+            if not (args.save and args.save.endswith((".mp4", ".gif"))):
+                fig.canvas.draw_idle()
+                fig.canvas.flush_events()
+                plt.close(fig)
 
         return sample_lines + [planned_line, trail_line, pos_dot, info_text]
 
@@ -205,6 +210,10 @@ if __name__ == "__main__":
     parser.add_argument("--continuous", action="store_true", help="Use continuous-time SDE formulation")
     parser.add_argument("--gpu", action="store_true", help="Use CuPy for GPU acceleration")
     parser.add_argument("--save", type=str, default=None, help="Save figure/animation to file")
+    parser.add_argument("--K", type=int, default=1024, help="Number of samples")
+    parser.add_argument("--T", type=int, default=40, help="Planning horizon")
+    parser.add_argument("--sigma", type=float, default=1.0, help="Control noise std dev")
+    parser.add_argument("--lambda_", "--lambda", type=float, default=10.0, help="Temperature parameter")
     args = parser.parse_args()
     if args.animate:
         run_animate(args)

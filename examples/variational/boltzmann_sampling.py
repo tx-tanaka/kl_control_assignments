@@ -68,20 +68,32 @@ def main():
         sizes = [1000, 10000, 100000, 1000000]
         print(f'{"N":>10s}  {"Time (ms)":>10s}  {"F(Q*)":>10s}  {"Backend":>8s}')
         print('-' * 45)
+        X_warm = rng.uniform(0, 1, size=(100, 2))
+        C_warm = xp.asarray(landscape_2d(X_warm[:, 0], X_warm[:, 1], xp=np))
+        r_warm, _ = desirability_scores(C_warm, alpha, xp=xp)
+        free_energy_estimate(C_warm, alpha, xp=xp)
+        inverse_cdf_resample(X_warm, r_warm, n_resample=10, rng=rng, xp=xp)
+        if hasattr(xp, 'cuda'):
+            xp.cuda.Stream.null.synchronize()
+
+        n_trials = 10
         for n in sizes:
             X = rng.uniform(0, 1, size=(n, 2))
             C = landscape_2d(X[:, 0], X[:, 1], xp=np)
             C_xp = xp.asarray(C)
-            # warmup
-            desirability_scores(C_xp, alpha, xp=xp)
-            t0 = time.time()
-            r, _ = desirability_scores(C_xp, alpha, xp=xp)
-            F = free_energy_estimate(C_xp, alpha, xp=xp)
-            inverse_cdf_resample(X, r, n_resample=1000, rng=rng, xp=xp)
-            if hasattr(xp, 'cuda'):
-                xp.cuda.Stream.null.synchronize()
-            ms = (time.time() - t0) * 1000
-            print(f'{n:>10d}  {ms:>10.1f}  {F:>10.4f}  {xp.__name__:>8s}')
+            times = []
+            for _ in range(n_trials):
+                if hasattr(xp, 'cuda'):
+                    xp.cuda.Stream.null.synchronize()
+                t0 = time.time()
+                r, _ = desirability_scores(C_xp, alpha, xp=xp)
+                F = free_energy_estimate(C_xp, alpha, xp=xp)
+                inverse_cdf_resample(X, r, n_resample=1000, rng=rng, xp=xp)
+                if hasattr(xp, 'cuda'):
+                    xp.cuda.Stream.null.synchronize()
+                times.append(time.time() - t0)
+            ms = np.median(times) * 1000
+            print(f'{n:>10d}  {ms:>10.2f}  {F:>10.4f}  {xp.__name__:>8s}')
         return
 
     # --- Cost landscape on a fine grid (for plotting) ---

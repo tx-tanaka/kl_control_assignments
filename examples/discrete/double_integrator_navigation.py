@@ -113,6 +113,7 @@ if args.animate:
     history = []
     crash_count = [0]
     done = [False]
+    anim_ref = [None]
 
     def update(frame):
         global x
@@ -153,11 +154,15 @@ if args.animate:
             print(f'  REACHED GOAL in {frame} steps (crashes={crash_count[0]})')
             ax.set_title(f'MPPI {env_name}  |  GOAL in {frame} steps  |  crashes={crash_count[0]}')
             done[0] = True
+            fig.canvas.draw_idle()
+            fig.canvas.flush_events()
+            plt.close(fig)
 
         return trail_line, pos_dot
 
     anim = FuncAnimation(fig, update, frames=args.steps, interval=30,
                          blit=False, repeat=False, cache_frame_data=False)
+    anim_ref[0] = anim
     raise_window(fig)
     plt.show()
 

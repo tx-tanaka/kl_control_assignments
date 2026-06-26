@@ -29,11 +29,11 @@ python3 examples/discrete/gridworld_forward_mc.py
 python3 examples/discrete/gridworld_forward_mc.py --N 200 --T 80
 ```
 
-### gridworld_z_learning.py — Infinite-Horizon Z-Iteration
+### gridworld_z_learning.py — Infinite-Horizon Z-Iteration and Z-Learning
 
-Solves the infinite-horizon version of the problem, where the goal is absorbing (all actions at the goal return to the goal with zero cost). The desirability Z\* satisfies the fixed-point equation Z = M @ Z, which can be solved either by direct linear algebra ((I - M_red)^{-1} m_goal) or by power iteration Z^{k+1} = M @ Z^{k} with Z(goal) = 1 fixed.
+Solves the infinite-horizon version of the problem, where the goal is absorbing (all actions at the goal return to the goal with zero cost). The desirability Z\* satisfies the fixed-point equation Z = M @ Z, which can be solved either by direct linear algebra ((I - M_red)^{-1} m_goal) or by power iteration Z^{k+1} = M @ Z^{k} with Z(goal) = 1 fixed (Eq. 7.76).
 
-The convergence plot shows exponential convergence of power iteration to the direct solve. The resulting policy is stationary (time-independent), unlike the finite-horizon backward solution.
+The convergence plot compares model-based Z-iteration (Eq. 7.76) against data-driven Z-learning (Eq. 7.82), which updates Z online from individual transitions under the reference policy. Both converge to the same fixed point. The resulting policy is stationary (time-independent), unlike the finite-horizon backward solution.
 
 ```bash
 python3 examples/discrete/gridworld_z_learning.py
@@ -61,9 +61,9 @@ A 4D double integrator [x, y, vx, vy] navigating through obstacle fields. This i
 
 ```bash
 python3 examples/discrete/double_integrator_navigation.py --env config/environments/three_mountains.yaml --animate
-python3 examples/discrete/double_integrator_navigation.py --env config/environments/forest.yaml --T 200 --sigma 5.0 --animate
+python3 examples/discrete/double_integrator_navigation.py --env config/environments/forest.yaml --sigma 20.0 --animate
 python3 examples/discrete/double_integrator_navigation.py --env config/environments/u_trap.yaml --T 200 --animate
-python3 examples/discrete/double_integrator_navigation.py --env config/environments/double_slit.yaml --sigma 5.0 --animate
+python3 examples/discrete/double_integrator_navigation.py --env config/environments/double_slit.yaml --sigma 10.0 --animate
 ```
 
 ### unicycle.py — Nonholonomic Vehicle

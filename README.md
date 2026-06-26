@@ -22,12 +22,16 @@ source .venv/bin/activate
 pip install -r requirements-base.txt
 ```
 
-For GPU acceleration (optional), install CuPy matching your CUDA version and the corresponding cuBLAS runtime:
+For GPU acceleration (optional), first check your CUDA version:
+```bash
+nvcc --version       # or: nvidia-smi
+```
+Then install CuPy matching your CUDA version and the corresponding cuBLAS runtime:
 ```bash
 pip install cupy-cuda12x nvidia-cublas-cu12    # CUDA 12.x
 pip install cupy-cuda11x nvidia-cublas-cu11    # CUDA 11.x
 ```
-If CuPy's CCCL headers fail to compile, pin to a known working version (e.g. `cupy-cuda12x==14.0.0`).
+If CuPy fails to compile its CCCL headers on first use in an example, pin to a known working version (e.g. `cupy-cuda12x==14.0.0`).
 
 Numba (included in requirements) compiles GPU kernels used in fixed wing examples automatically for GPU acceleration.
 
@@ -66,7 +70,7 @@ python examples/discrete/gridworld_backward.py --env config/environments/landing
 python examples/discrete/gridworld_forward_mc.py
 python examples/discrete/gridworld_forward_mc.py --env config/environments/landing_site.yaml
 
-# Z-learning (infinite horizon)
+# Infinite horizon: Z-iteration (Eq. 7.76) and Z-learning (Eq. 7.82)
 python examples/discrete/gridworld_z_learning.py
 python examples/discrete/gridworld_z_learning.py --env config/environments/landing_site.yaml
 
@@ -77,7 +81,7 @@ python examples/discrete/determinism_breaking.py --slip 0.2
 
 ### Assignment 3: Path Integral Control (Ch. 8)
 
-Path integral control generalizes KL control from linearly solvable MDPs (Ch. 7) to continuous state spaces. Assignment 3 implements both the discrete-time and the continuous-time SDE versions, and test them on four systems: a double integrator, a nonholonomic unicycle, a cart-pole swing-up, and a 13D fixed-wing aircraft.
+Path integral control generalizes KL control from linearly solvable MDPs (Ch. 7) to continuous state spaces. Assignment 3 implements both the discrete-time and the continuous-time SDE versions, and tests them on four systems: a double integrator, a nonholonomic unicycle, a cart-pole swing-up, and a 13D fixed-wing aircraft.
 
 Cart-pole swing-up:
 
@@ -102,13 +106,13 @@ The effect of horizon length $T$ and noise covariance $\sigma$ on planning behav
 https://github.com/user-attachments/assets/cfba2851-8900-496b-9dad-aa6db3044e2f
 
 ```bash
-# Forest: default parameters vs increased horizon and covariance
+# Forest: low covariance threads through nearest gaps, high covariance is more conservative and routes through sparser regions
 python examples/discrete/double_integrator_navigation.py --env config/environments/forest.yaml --animate
-python examples/discrete/double_integrator_navigation.py --env config/environments/forest.yaml --T 200 --sigma 5.0 --animate
+python examples/discrete/double_integrator_navigation.py --env config/environments/forest.yaml --sigma 20.0 --animate
 
 # Double slit: low covariance gets stuck at the barrier, high covariance breaks symmetry
 python examples/discrete/double_integrator_navigation.py --env config/environments/double_slit.yaml --sigma 1.0 --animate
-python examples/discrete/double_integrator_navigation.py --env config/environments/double_slit.yaml --sigma 5.0 --animate
+python examples/discrete/double_integrator_navigation.py --env config/environments/double_slit.yaml --sigma 10.0 --animate
 
 # U-trap: short horizon walks into the trap, long horizon plans around the barrier
 python examples/discrete/double_integrator_navigation.py --env config/environments/u_trap.yaml --T 50 --animate
@@ -119,6 +123,7 @@ Nonholonomic unicycle through the same environments:
 
 ```bash
 python examples/discrete/unicycle.py --animate
+python examples/discrete/unicycle.py --env config/environments/three_mountains.yaml --T 200 --sigma 5.0 --lambda_ 10 --animate
 python examples/discrete/unicycle.py --env config/environments/forest.yaml --animate
 python examples/discrete/unicycle.py --env config/environments/u_trap.yaml --T 200 --sigma 2.0 --animate
 ```
@@ -128,7 +133,8 @@ Continuous-time SDE formulation:
 ```bash
 python examples/continuous/double_integrator_sde.py --animate
 python examples/continuous/double_integrator_sde.py --env config/environments/forest.yaml --animate
-python examples/continuous/unicycle_sde.py --animate
+python examples/continuous/unicycle_sde.py --animate --sigma 0.2 --T 150 --samples 500 --lambda_ 40
+python examples/continuous/unicycle_sde.py --animate --sigma 4.0 --T 400 --samples 2048 --lambda_ 50
 python examples/continuous/unicycle_sde.py --env forest --animate
 python examples/continuous/unicycle_sde.py --env u_trap --animate --T 400 --sigma 2.0 --lambda_ 100
 python examples/continuous/cartpole_sde.py --animate

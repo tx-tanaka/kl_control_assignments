@@ -5,6 +5,8 @@ from lmdp.backward import (
     backward_recursion,
     reconstruct_policy,
     value_from_desirability,
+    bellman_recursion_general,
+    bellman_recursion_stochastic,
 )
 from lmdp.forward_mc import (
     generate_sample_paths,
@@ -14,12 +16,9 @@ from lmdp.forward_mc import (
     sample_action,
     forward_mc_control,
 )
-from lmdp.backward import (
-    bellman_recursion_general,
-    bellman_recursion_stochastic,
-)
-from lmdp.z_learning import (
+from lmdp.z_iteration import (
     z_linear_solve,
     z_power_iteration,
     policy_from_Z,
 )
+from lmdp.z_learning import z_learning
